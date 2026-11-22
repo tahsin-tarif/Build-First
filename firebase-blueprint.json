@@ -1,0 +1,288 @@
+{
+  "entities": {
+    "UserPrivate": {
+      "title": "UserPrivate",
+      "description": "Private user account record containing PII and active workspace preference.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 254 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "activeRole": { "type": "string", "enum": ["poster", "builder"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "activeRole", "createdAt"]
+    },
+    "BuilderProfile": {
+      "title": "BuilderProfile",
+      "description": "Public builder & problem-poster portfolio record without PII.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "headline": { "type": "string", "maxLength": 160 },
+        "bio": { "type": "string", "maxLength": 800 },
+        "techStack": { "type": "array" },
+        "githubUrl": { "type": "string", "maxLength": 300 },
+        "portfolioUrl": { "type": "string", "maxLength": 300 },
+        "solutionsBuilt": { "type": "number" },
+        "dealsClosed": { "type": "number" },
+        "totalUpvotes": { "type": "number" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "visibility", "updatedAt"]
+    },
+    "Problem": {
+      "title": "Problem",
+      "description": "Real-world bottleneck or workflow problem posted by a user for developers to solve.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "authorRole": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "minLength": 5, "maxLength": 160 },
+        "description": { "type": "string", "minLength": 15, "maxLength": 4000 },
+        "category": {
+          "type": "string",
+          "enum": ["Business & Retail", "Education", "Personal Productivity", "E-commerce", "Automation", "Other"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Open for Builders", "In Progress", "Solution Ready"]
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["Low", "Standard", "Urgent"]
+        },
+        "hasBudget": { "type": "boolean" },
+        "budgetAmount": { "type": "number" },
+        "budgetCurrency": { "type": "string", "enum": ["USD", "BDT", "EUR"] },
+        "upvotesCount": { "type": "number" },
+        "activeBuildersCount": { "type": "number" },
+        "solutionsCount": { "type": "number" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "authorId",
+        "authorName",
+        "title",
+        "description",
+        "category",
+        "status",
+        "urgency",
+        "hasBudget",
+        "upvotesCount",
+        "activeBuildersCount",
+        "solutionsCount",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ProblemUpvote": {
+      "title": "ProblemUpvote",
+      "description": "Me Too demand upvote record for a problem.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "problemId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "problemId", "isPublic", "createdAt"]
+    },
+    "ProblemComment": {
+      "title": "ProblemComment",
+      "description": "Clarification question or discussion comment on a problem.",
+      "type": "object",
+      "properties": {
+        "problemId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "authorTag": { "type": "string", "maxLength": 60 },
+        "body": { "type": "string", "minLength": 2, "maxLength": 1500 },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["problemId", "authorId", "authorName", "body", "isPublic", "createdAt"]
+    },
+    "BuilderIntent": {
+      "title": "BuilderIntent",
+      "description": "Developer intent signal showing active builders working on a problem.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "problemId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "builderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "problemId", "builderName", "isPublic", "createdAt"]
+    },
+    "Solution": {
+      "title": "Solution",
+      "description": "Working software prototype built first and pitched to the problem poster.",
+      "type": "object",
+      "properties": {
+        "problemId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "problemTitle": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "builderId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "builderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "pitch": { "type": "string", "minLength": 10, "maxLength": 3000 },
+        "liveDemoUrl": { "type": "string", "minLength": 5, "maxLength": 500 },
+        "videoUrl": { "type": "string", "maxLength": 500 },
+        "screenshotUrl": { "type": "string", "maxLength": 500 },
+        "licensingModel": {
+          "type": "string",
+          "enum": [
+            "One-Time Exclusive Buyout",
+            "Multi-User License (SaaS/Template)",
+            "Free / Open-Source Portfolio Project"
+          ]
+        },
+        "priceAmount": { "type": "number" },
+        "priceCurrency": { "type": "string", "enum": ["USD", "BDT", "EUR"] },
+        "techStack": { "type": "array" },
+        "upvotesCount": { "type": "number" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "problemId",
+        "problemTitle",
+        "builderId",
+        "builderName",
+        "title",
+        "pitch",
+        "liveDemoUrl",
+        "licensingModel",
+        "priceAmount",
+        "priceCurrency",
+        "upvotesCount",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Deal": {
+      "title": "Deal",
+      "description": "Active negotiation and escrow record between problem poster and builder.",
+      "type": "object",
+      "properties": {
+        "problemId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "solutionId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "solutionTitle": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "posterId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "posterName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "builderId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "builderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "offerAmount": { "type": "number" },
+        "offerCurrency": { "type": "string", "enum": ["USD", "BDT", "EUR"] },
+        "licensingModel": { "type": "string", "maxLength": 100 },
+        "escrowStatus": {
+          "type": "string",
+          "enum": [
+            "Negotiating",
+            "Payment Held in Escrow",
+            "Code/Access Delivered",
+            "Completed"
+          ]
+        },
+        "customizationNotes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "problemId",
+        "solutionId",
+        "solutionTitle",
+        "posterId",
+        "posterName",
+        "builderId",
+        "builderName",
+        "offerAmount",
+        "offerCurrency",
+        "licensingModel",
+        "escrowStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Deal room chat message or formal offer event scoped to deal participants.",
+      "type": "object",
+      "properties": {
+        "dealId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "posterId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "builderId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "senderRole": { "type": "string", "enum": ["poster", "builder"] },
+        "messageType": {
+          "type": "string",
+          "enum": ["text", "customization_request", "formal_offer", "escrow_update"]
+        },
+        "body": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "offerAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "dealId",
+        "posterId",
+        "builderId",
+        "senderId",
+        "senderName",
+        "senderRole",
+        "messageType",
+        "body",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPrivate" },
+      "description": "Private user account documents strictly accessible only by the owner."
+    },
+    "/profiles/{userId}": {
+      "schema": { "$ref": "#/entities/BuilderProfile" },
+      "description": "Public builder & poster portfolio profiles without PII."
+    },
+    "/problems/{problemId}": {
+      "schema": { "$ref": "#/entities/Problem" },
+      "description": "Public marketplace problem posts."
+    },
+    "/problems/{problemId}/upvotes/{userId}": {
+      "schema": { "$ref": "#/entities/ProblemUpvote" },
+      "description": "Per-user upvote records for a problem."
+    },
+    "/problems/{problemId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/ProblemComment" },
+      "description": "Clarification comments under a problem."
+    },
+    "/problems/{problemId}/builders/{userId}": {
+      "schema": { "$ref": "#/entities/BuilderIntent" },
+      "description": "Builder intent signals for a problem."
+    },
+    "/solutions/{solutionId}": {
+      "schema": { "$ref": "#/entities/Solution" },
+      "description": "Working software solutions submitted for problems and showcased in marketplace."
+    },
+    "/deals/{dealId}": {
+      "schema": { "$ref": "#/entities/Deal" },
+      "description": "Deal negotiation and escrow tracking documents."
+    },
+    "/deals/{dealId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Deal room real-time messages restricted to deal participants."
+    }
+  }
+}

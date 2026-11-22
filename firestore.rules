@@ -1,0 +1,443 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isNonEmptyString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptionalString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function isStringList(val, maxItems) {
+      return val is list && val.size() <= maxItems && (val.size() == 0 || (val[0] is string && val[0].size() <= 60));
+    }
+
+    // --- Entity Validation Blueprints ---
+    function isValidUserPrivate(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'activeRole', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'activeRole', 'createdAt', 'updatedAt'])
+        && data.uid == userId
+        && isNonEmptyString(data.email, 3, 254)
+        && isNonEmptyString(data.displayName, 1, 100)
+        && data.activeRole in ['poster', 'builder']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'headline', 'bio', 'techStack',
+          'githubUrl', 'portfolioUrl', 'solutionsBuilt', 'dealsClosed',
+          'totalUpvotes', 'visibility', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'displayName', 'headline', 'bio', 'techStack',
+          'githubUrl', 'portfolioUrl', 'solutionsBuilt', 'dealsClosed',
+          'totalUpvotes', 'visibility', 'updatedAt'
+        ])
+        && data.uid == userId
+        && isNonEmptyString(data.displayName, 1, 100)
+        && isOptionalString(data.headline, 160)
+        && isOptionalString(data.bio, 800)
+        && isStringList(data.techStack, 15)
+        && isOptionalString(data.githubUrl, 300)
+        && isOptionalString(data.portfolioUrl, 300)
+        && data.solutionsBuilt is int && data.solutionsBuilt >= 0 && data.solutionsBuilt <= 100000
+        && data.dealsClosed is int && data.dealsClosed >= 0 && data.dealsClosed <= 100000
+        && data.totalUpvotes is int && data.totalUpvotes >= 0 && data.totalUpvotes <= 1000000
+        && data.visibility == 'public'
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProblem(data) {
+      return data.keys().hasAll([
+          'authorId', 'authorName', 'authorRole', 'title', 'description',
+          'category', 'status', 'urgency', 'hasBudget', 'budgetAmount',
+          'budgetCurrency', 'upvotesCount', 'activeBuildersCount', 'solutionsCount',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'authorId', 'authorName', 'authorRole', 'title', 'description',
+          'category', 'status', 'urgency', 'hasBudget', 'budgetAmount',
+          'budgetCurrency', 'upvotesCount', 'activeBuildersCount', 'solutionsCount',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.authorId)
+        && isNonEmptyString(data.authorName, 1, 100)
+        && isOptionalString(data.authorRole, 100)
+        && isNonEmptyString(data.title, 5, 160)
+        && isNonEmptyString(data.description, 15, 4000)
+        && data.category in [
+          'Business & Retail', 'Education', 'Personal Productivity',
+          'E-commerce', 'Automation', 'Other'
+        ]
+        && data.status in ['Open for Builders', 'In Progress', 'Solution Ready']
+        && data.urgency in ['Low', 'Standard', 'Urgent']
+        && data.hasBudget is bool
+        && (data.budgetAmount == null || (data.budgetAmount is number && data.budgetAmount >= 0 && data.budgetAmount <= 10000000))
+        && data.budgetCurrency in ['USD', 'BDT', 'EUR']
+        && data.upvotesCount is int && data.upvotesCount >= 0 && data.upvotesCount <= 1000000
+        && data.activeBuildersCount is int && data.activeBuildersCount >= 0 && data.activeBuildersCount <= 100000
+        && data.solutionsCount is int && data.solutionsCount >= 0 && data.solutionsCount <= 100000
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSolution(data) {
+      return data.keys().hasAll([
+          'problemId', 'problemTitle', 'builderId', 'builderName', 'title',
+          'pitch', 'liveDemoUrl', 'videoUrl', 'screenshotUrl', 'licensingModel',
+          'priceAmount', 'priceCurrency', 'techStack', 'upvotesCount',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'problemId', 'problemTitle', 'builderId', 'builderName', 'title',
+          'pitch', 'liveDemoUrl', 'videoUrl', 'screenshotUrl', 'licensingModel',
+          'priceAmount', 'priceCurrency', 'techStack', 'upvotesCount',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.problemId)
+        && isNonEmptyString(data.problemTitle, 1, 160)
+        && isValidId(data.builderId)
+        && isNonEmptyString(data.builderName, 1, 100)
+        && isNonEmptyString(data.title, 3, 140)
+        && isNonEmptyString(data.pitch, 10, 3000)
+        && isNonEmptyString(data.liveDemoUrl, 5, 500)
+        && isOptionalString(data.videoUrl, 500)
+        && isOptionalString(data.screenshotUrl, 500)
+        && data.licensingModel in [
+          'One-Time Exclusive Buyout',
+          'Multi-User License (SaaS/Template)',
+          'Free / Open-Source Portfolio Project'
+        ]
+        && data.priceAmount is number && data.priceAmount >= 0 && data.priceAmount <= 10000000
+        && data.priceCurrency in ['USD', 'BDT', 'EUR']
+        && isStringList(data.techStack, 10)
+        && data.upvotesCount is int && data.upvotesCount >= 0 && data.upvotesCount <= 1000000
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDeal(data) {
+      return data.keys().hasAll([
+          'problemId', 'solutionId', 'solutionTitle', 'posterId', 'posterName',
+          'builderId', 'builderName', 'offerAmount', 'offerCurrency',
+          'licensingModel', 'escrowStatus', 'customizationNotes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'problemId', 'solutionId', 'solutionTitle', 'posterId', 'posterName',
+          'builderId', 'builderName', 'offerAmount', 'offerCurrency',
+          'licensingModel', 'escrowStatus', 'customizationNotes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.problemId)
+        && isValidId(data.solutionId)
+        && isNonEmptyString(data.solutionTitle, 1, 140)
+        && isValidId(data.posterId)
+        && isNonEmptyString(data.posterName, 1, 100)
+        && isValidId(data.builderId)
+        && isNonEmptyString(data.builderName, 1, 100)
+        && data.offerAmount is number && data.offerAmount >= 0 && data.offerAmount <= 10000000
+        && data.offerCurrency in ['USD', 'BDT', 'EUR']
+        && isNonEmptyString(data.licensingModel, 1, 100)
+        && data.escrowStatus in [
+          'Negotiating',
+          'Payment Held in Escrow',
+          'Code/Access Delivered',
+          'Completed'
+        ]
+        && isOptionalString(data.customizationNotes, 1000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(data, dealId) {
+      return data.keys().hasAll([
+          'dealId', 'posterId', 'builderId', 'senderId', 'senderName',
+          'senderRole', 'messageType', 'body', 'offerAmount', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'dealId', 'posterId', 'builderId', 'senderId', 'senderName',
+          'senderRole', 'messageType', 'body', 'offerAmount', 'createdAt'
+        ])
+        && data.dealId == dealId
+        && isValidId(data.posterId)
+        && isValidId(data.builderId)
+        && isValidId(data.senderId)
+        && isNonEmptyString(data.senderName, 1, 100)
+        && data.senderRole in ['poster', 'builder']
+        && data.messageType in ['text', 'customization_request', 'formal_offer', 'escrow_update']
+        && isNonEmptyString(data.body, 1, 2000)
+        && (data.offerAmount == null || (data.offerAmount is number && data.offerAmount >= 0 && data.offerAmount <= 10000000))
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // Private User Records (PII isolated)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isValidId(userId)
+        && isVerified()
+        && isOwner(userId)
+        && isValidUserPrivate(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerified()
+        && isOwner(userId)
+        && isValidUserPrivate(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'activeRole', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Public Builder / Poster Portfolios (No PII)
+    match /profiles/{userId} {
+      allow get: if isValidId(userId) && existing().visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isValidId(userId)
+        && isVerified()
+        && isOwner(userId)
+        && isValidProfile(incoming(), userId)
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerified()
+        && isOwner(userId)
+        && isValidProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'headline', 'bio', 'techStack', 'githubUrl',
+          'portfolioUrl', 'solutionsBuilt', 'dealsClosed', 'totalUpvotes', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // Problems
+    match /problems/{problemId} {
+      allow get: if isValidId(problemId) && existing().visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isValidId(problemId)
+        && isVerified()
+        && isValidProblem(incoming())
+        && incoming().authorId == request.auth.uid
+        && incoming().upvotesCount == 1
+        && incoming().activeBuildersCount == 0
+        && incoming().solutionsCount == 0
+        && incoming().status == 'Open for Builders'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(problemId)
+        && isVerified()
+        && isValidProblem(incoming())
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (existing().authorId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'description', 'category', 'urgency',
+              'hasBudget', 'budgetAmount', 'budgetCurrency', 'status', 'updatedAt'
+            ]))
+          || (incoming().diff(existing()).affectedKeys().hasOnly(['upvotesCount', 'updatedAt'])
+            && (
+              (incoming().upvotesCount == existing().upvotesCount + 1
+                && existsAfter(/databases/$(database)/documents/problems/$(problemId)/upvotes/$(request.auth.uid)))
+              || (incoming().upvotesCount == existing().upvotesCount - 1
+                && !existsAfter(/databases/$(database)/documents/problems/$(problemId)/upvotes/$(request.auth.uid)))
+            ))
+          || (incoming().diff(existing()).affectedKeys().hasOnly(['activeBuildersCount', 'status', 'updatedAt'])
+            && incoming().activeBuildersCount == existing().activeBuildersCount + 1
+            && existsAfter(/databases/$(database)/documents/problems/$(problemId)/builders/$(request.auth.uid))
+            && (incoming().status == 'In Progress' || incoming().status == existing().status))
+          || (incoming().diff(existing()).affectedKeys().hasOnly(['solutionsCount', 'status', 'updatedAt'])
+            && incoming().solutionsCount == existing().solutionsCount + 1
+            && incoming().status == 'Solution Ready')
+        );
+      allow delete: if isValidId(problemId) && isVerified() && existing().authorId == request.auth.uid;
+
+      match /upvotes/{userId} {
+        allow get: if isValidId(problemId) && isValidId(userId) && existing().isPublic == true;
+        allow list: if resource.data.isPublic == true;
+        allow create: if isValidId(problemId)
+          && isValidId(userId)
+          && isVerified()
+          && isOwner(userId)
+          && incoming().keys().hasAll(['userId', 'problemId', 'isPublic', 'createdAt'])
+          && incoming().keys().hasOnly(['userId', 'problemId', 'isPublic', 'createdAt'])
+          && incoming().userId == request.auth.uid
+          && incoming().problemId == problemId
+          && incoming().isPublic == true
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/problems/$(problemId));
+        allow update: if false;
+        allow delete: if isValidId(problemId) && isValidId(userId) && isVerified() && isOwner(userId);
+      }
+
+      match /builders/{userId} {
+        allow get: if isValidId(problemId) && isValidId(userId) && existing().isPublic == true;
+        allow list: if resource.data.isPublic == true;
+        allow create: if isValidId(problemId)
+          && isValidId(userId)
+          && isVerified()
+          && isOwner(userId)
+          && incoming().keys().hasAll(['userId', 'problemId', 'builderName', 'isPublic', 'createdAt'])
+          && incoming().keys().hasOnly(['userId', 'problemId', 'builderName', 'isPublic', 'createdAt'])
+          && incoming().userId == request.auth.uid
+          && incoming().problemId == problemId
+          && isNonEmptyString(incoming().builderName, 1, 100)
+          && incoming().isPublic == true
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/problems/$(problemId));
+        allow update: if false;
+        allow delete: if isValidId(problemId) && isValidId(userId) && isVerified() && isOwner(userId);
+      }
+
+      match /comments/{commentId} {
+        allow get: if isValidId(problemId) && isValidId(commentId) && existing().isPublic == true;
+        allow list: if resource.data.isPublic == true;
+        allow create: if isValidId(problemId)
+          && isValidId(commentId)
+          && isVerified()
+          && incoming().keys().hasAll(['problemId', 'authorId', 'authorName', 'authorTag', 'body', 'isPublic', 'createdAt'])
+          && incoming().keys().hasOnly(['problemId', 'authorId', 'authorName', 'authorTag', 'body', 'isPublic', 'createdAt'])
+          && incoming().problemId == problemId
+          && incoming().authorId == request.auth.uid
+          && isNonEmptyString(incoming().authorName, 1, 100)
+          && isOptionalString(incoming().authorTag, 60)
+          && isNonEmptyString(incoming().body, 2, 1500)
+          && incoming().isPublic == true
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/problems/$(problemId));
+        allow update: if false;
+        allow delete: if isValidId(problemId) && isValidId(commentId) && isVerified() && existing().authorId == request.auth.uid;
+      }
+    }
+
+    // Solutions
+    match /solutions/{solutionId} {
+      allow get: if isValidId(solutionId) && existing().visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isValidId(solutionId)
+        && isVerified()
+        && isValidSolution(incoming())
+        && incoming().builderId == request.auth.uid
+        && incoming().upvotesCount == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/problems/$(incoming().problemId));
+      allow update: if isValidId(solutionId)
+        && isVerified()
+        && isValidSolution(incoming())
+        && incoming().builderId == existing().builderId
+        && incoming().problemId == existing().problemId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (existing().builderId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'pitch', 'liveDemoUrl', 'videoUrl', 'screenshotUrl',
+              'licensingModel', 'priceAmount', 'priceCurrency', 'techStack', 'updatedAt'
+            ]))
+          || (incoming().diff(existing()).affectedKeys().hasOnly(['upvotesCount', 'updatedAt'])
+            && (incoming().upvotesCount == existing().upvotesCount + 1
+              || incoming().upvotesCount == existing().upvotesCount - 1))
+        );
+      allow delete: if isValidId(solutionId) && isVerified() && existing().builderId == request.auth.uid;
+    }
+
+    // Deals & Real-Time Deal Room Messages
+    match /deals/{dealId} {
+      allow get: if isValidId(dealId)
+        && isSignedIn()
+        && (existing().posterId == request.auth.uid || existing().builderId == request.auth.uid);
+      allow list: if isSignedIn()
+        && (resource.data.posterId == request.auth.uid || resource.data.builderId == request.auth.uid);
+      allow create: if isValidId(dealId)
+        && isVerified()
+        && isValidDeal(incoming())
+        && (incoming().posterId == request.auth.uid || incoming().builderId == request.auth.uid)
+        && incoming().escrowStatus == 'Negotiating'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/solutions/$(incoming().solutionId));
+      allow update: if isValidId(dealId)
+        && isVerified()
+        && isValidDeal(incoming())
+        && existing().escrowStatus != 'Completed'
+        && (existing().posterId == request.auth.uid || existing().builderId == request.auth.uid)
+        && incoming().problemId == existing().problemId
+        && incoming().solutionId == existing().solutionId
+        && incoming().posterId == existing().posterId
+        && incoming().builderId == existing().builderId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['offerAmount', 'offerCurrency', 'customizationNotes', 'updatedAt'])
+          || (incoming().diff(existing()).affectedKeys().hasOnly(['escrowStatus', 'updatedAt']) && (
+            (existing().escrowStatus == 'Negotiating' && incoming().escrowStatus == 'Payment Held in Escrow')
+            || (existing().escrowStatus == 'Payment Held in Escrow' && incoming().escrowStatus == 'Code/Access Delivered')
+            || (existing().escrowStatus == 'Code/Access Delivered' && incoming().escrowStatus == 'Completed')
+          ))
+        );
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get: if isValidId(dealId)
+          && isValidId(messageId)
+          && isSignedIn()
+          && (existing().posterId == request.auth.uid || existing().builderId == request.auth.uid);
+        allow list: if isSignedIn()
+          && (resource.data.posterId == request.auth.uid || resource.data.builderId == request.auth.uid);
+        allow create: if isValidId(dealId)
+          && isValidId(messageId)
+          && isVerified()
+          && isValidMessage(incoming(), dealId)
+          && incoming().senderId == request.auth.uid
+          && (incoming().posterId == request.auth.uid || incoming().builderId == request.auth.uid)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/deals/$(dealId))
+          && get(/databases/$(database)/documents/deals/$(dealId)).data.posterId == incoming().posterId
+          && get(/databases/$(database)/documents/deals/$(dealId)).data.builderId == incoming().builderId;
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+  }
+}
